@@ -8,54 +8,149 @@
 ; Configuration
 global API_URL := "http://localhost:6326/api/genshin/notes"
 global UPDATE_INTERVAL := 1 * 60 * 60000  ; 1 hour
+global ICON_PATH := "Z:\Applications\Genshin Impact game\GenshinImpact.exe"
+global UI_MODE := "compact"  ; Options: "full", "compact", "mini"
+; full = normal detailed view
+; compact = icon-only grid view (2x3 grid)
+; mini = single line icon-only view
 
 ; Create main GUI
 global myGui := Gui("-AlwaysOnTop -Caption +ToolWindow", "Genshin Widget")
 myGui.BackColor := "0x1a1a2e"
-myGui.Show("w280 h400 x" . (A_ScreenWidth - 300) . " y30")
+
+; Set window size and position based on UI mode
+if (UI_MODE = "mini") {
+    myGui.Show("w300 h45 x" . (A_ScreenWidth - 320) . " y30")
+} else if (UI_MODE = "compact") {
+    myGui.Show("w180 h180 x" . (A_ScreenWidth - 200) . " y30")
+} else {
+    myGui.Show("w280 h400 x" . (A_ScreenWidth - 300) . " y30")
+}
+
 myGui.SetFont("s10 c0xeaeaea", "Segoe UI")
 
-; Header with game icon
-myGui.AddPicture("x10 y10 w40 h40 Background0x1a1a2e", "")  ; Placeholder for icon
-myGui.AddText("x60 y15 w140 c0xffd700", "Genshin Impact")
-global lastUpdateText := myGui.AddText("x60 y35 w140 c0xaaaaaa", "Daily Notes")
+if (UI_MODE = "full") {
+    ; Full UI Mode - Normal detailed view
+    ; Header with game icon
+    if FileExist(ICON_PATH) {
+        myGui.AddPicture("x10 y10 w40 h40", ICON_PATH)
+    } else {
+        myGui.AddPicture("x10 y10 w40 h40 Background0x1a1a2e", "")
+    }
+    myGui.AddText("x60 y15 w140 c0xffd700", "Genshin Impact")
+    global lastUpdateText := myGui.AddText("x60 y35 w140 c0xaaaaaa", "Daily Notes")
 
-; Refresh button (subtle, beside close)
-refreshBtn := myGui.AddText("x230 y10 w20 h20 c0x4ecdc4 Center Background0x2a2a3e", "🔄")
-refreshBtn.OnEvent("Click", (*) => FetchData())
+    ; Refresh button (subtle, beside close)
+    refreshBtn := myGui.AddText("x230 y10 w20 h20 c0x4ecdc4 Center Background0x2a2a3e", "🔄")
+    refreshBtn.OnEvent("Click", (*) => FetchData())
 
-; Close button
-closeBtn := myGui.AddText("x260 y10 w20 h20 c0xff6b6b Center Background0x2a2a3e", "✕")
-closeBtn.OnEvent("Click", (*) => ExitApp())
+    ; Close button
+    closeBtn := myGui.AddText("x260 y10 w20 h20 c0xff6b6b Center Background0x2a2a3e", "✕")
+    closeBtn.OnEvent("Click", (*) => ExitApp())
 
-; Account Info
-myGui.AddText("x10 y65 c0xffd700", "━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-global uidText := myGui.AddText("x10 y80 w120", "UID: Loading...")
-global nicknameText := myGui.AddText("x140 y80 w140", "Nickname: --")
+    ; Account Info
+    myGui.AddText("x10 y65 c0xffd700", "━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    global uidText := myGui.AddText("x10 y80 w120", "UID: Loading...")
+    global nicknameText := myGui.AddText("x140 y80 w140", "Nickname: --")
 
-; Resin Section
-myGui.AddText("x10 y110 c0x16c79a", "⚡ Original Resin")
-global resinText := myGui.AddText("x10 y130 w260", "0 / 200")
-global resinTimeText := myGui.AddText("x10 y150 w260 c0xaaaaaa", "Full in: Calculating...")
+    ; Resin Section
+    myGui.AddText("x10 y110 c0x16c79a", "⚡ Original Resin")
+    global resinText := myGui.AddText("x10 y130 w260", "0 / 200")
+    global resinTimeText := myGui.AddText("x10 y150 w260 c0xaaaaaa", "Full in: Calculating...")
 
-; Dailies Section
-myGui.AddText("x10 y180 c0x4ecdc4", "📋 Daily Commissions")
-global dailiesText := myGui.AddText("x10 y200 w260", "0 / 4 completed")
+    ; Dailies Section
+    myGui.AddText("x10 y180 c0x4ecdc4", "📋 Daily Commissions")
+    global dailiesText := myGui.AddText("x10 y200 w260", "0 / 4 completed")
 
-; Realm Currency Section
-myGui.AddText("x10 y230 c0xf39c12", "🏠 Realm Currency")
-global realmText := myGui.AddText("x10 y250 w260", "0 / 2400")
-global realmTimeText := myGui.AddText("x10 y270 w260 c0xaaaaaa", "Full in: Calculating...")
+    ; Realm Currency Section
+    myGui.AddText("x10 y230 c0xf39c12", "🏠 Realm Currency")
+    global realmText := myGui.AddText("x10 y250 w260", "0 / 2400")
+    global realmTimeText := myGui.AddText("x10 y270 w260 c0xaaaaaa", "Full in: Calculating...")
 
-; Weekly Boss Section
-myGui.AddText("x10 y300 c0xe74c3c", "⚔️ Weekly Boss Discount")
-global weeklyText := myGui.AddText("x10 y320 w260", "0 / 3 remaining")
+    ; Weekly Boss Section
+    myGui.AddText("x10 y300 c0xe74c3c", "⚔️ Weekly Boss Discount")
+    global weeklyText := myGui.AddText("x10 y320 w260", "0 / 3 remaining")
 
-; Expedition Section
-myGui.AddText("x10 y350 c0x9b59b6", "🗺️ Expeditions")
-global expeditionText := myGui.AddText("x10 y370 w260", "Loading...")
+    ; Expedition Section
+    myGui.AddText("x10 y350 c0x9b59b6", "🗺️ Expeditions")
+    global expeditionText := myGui.AddText("x10 y370 w260", "Loading...")
 
-myGui.Show("w280 h400")
+} else if (UI_MODE = "compact") {
+    ; Compact UI Mode - Icon-only grid view (2x3)
+    myGui.SetFont("s9")
+    
+    ; Close button
+    closeBtn := myGui.AddText("x160 y5 w15 h15 c0xff6b6b Center", "✕")
+    closeBtn.OnEvent("Click", (*) => ExitApp())
+    
+    ; Refresh button
+    refreshBtn := myGui.AddText("x140 y5 w15 h15 c0x4ecdc4 Center", "🔄")
+    refreshBtn.OnEvent("Click", (*) => FetchData())
+    
+    ; Grid layout - 2 columns, 3 rows
+    ; Row 1: Resin | Dailies
+    global resinIcon := myGui.AddText("x10 y25 w30 h30 c0x16c79a Center", "⚡")
+    global resinText := myGui.AddText("x45 y30 w60", "0/200")
+    
+    global dailiesIcon := myGui.AddText("x10 y65 w30 h30 c0x4ecdc4 Center", "📋")
+    global dailiesText := myGui.AddText("x45 y70 w60", "0/4")
+    
+    ; Row 2: Realm | Weekly
+    global realmIcon := myGui.AddText("x10 y105 w30 h30 c0xf39c12 Center", "🏠")
+    global realmText := myGui.AddText("x45 y110 w60", "0/2400")
+    
+    global weeklyIcon := myGui.AddText("x10 y145 w30 h30 c0xe74c3c Center", "⚔️")
+    global weeklyText := myGui.AddText("x45 y150 w60", "0/3")
+    
+    ; Expedition on the right side
+    global expeditionIcon := myGui.AddText("x110 y25 w30 h30 c0x9b59b6 Center", "🗺️")
+    global expeditionText := myGui.AddText("x110 y60 w60 Center", "0/5")
+    
+    ; Time indicators (smaller)
+    global resinTimeText := myGui.AddText("x45 y48 w60 c0x888888", "")
+    global realmTimeText := myGui.AddText("x45 y128 w60 c0x888888", "")
+    global lastUpdateText := myGui.AddText("x110 y80 w60 c0x666666 Center", "")
+    
+    ; Hidden elements for compatibility
+    global uidText := myGui.AddText("x0 y0 w0 h0", "")
+    global nicknameText := myGui.AddText("x0 y0 w0 h0", "")
+
+} else if (UI_MODE = "mini") {
+    ; Mini UI Mode - Single line icon-only view
+    myGui.SetFont("s9")
+    
+    ; Close button
+    closeBtn := myGui.AddText("x280 y5 w15 h15 c0xff6b6b Center", "✕")
+    closeBtn.OnEvent("Click", (*) => ExitApp())
+    
+    ; Refresh button
+    refreshBtn := myGui.AddText("x260 y5 w15 h15 c0x4ecdc4 Center", "🔄")
+    refreshBtn.OnEvent("Click", (*) => FetchData())
+    
+    ; Single line layout
+    global resinIcon := myGui.AddText("x10 y12 w20 h20 c0x16c79a", "⚡")
+    global resinText := myGui.AddText("x32 y15 w45", "0/200")
+    
+    global dailiesIcon := myGui.AddText("x80 y12 w20 h20 c0x4ecdc4", "📋")
+    global dailiesText := myGui.AddText("x102 y15 w30", "0/4")
+    
+    global realmIcon := myGui.AddText("x135 y12 w20 h20 c0xf39c12", "🏠")
+    global realmText := myGui.AddText("x157 y15 w50", "0/2400")
+    
+    global weeklyIcon := myGui.AddText("x210 y12 w20 h20 c0xe74c3c", "⚔️")
+    global weeklyText := myGui.AddText("x232 y15 w20", "0/3")
+    
+    ; Hidden elements for compatibility
+    global expeditionIcon := myGui.AddText("x0 y0 w0 h0", "")
+    global expeditionText := myGui.AddText("x0 y0 w0 h0", "")
+    global resinTimeText := myGui.AddText("x0 y0 w0 h0", "")
+    global realmTimeText := myGui.AddText("x0 y0 w0 h0", "")
+    global lastUpdateText := myGui.AddText("x0 y0 w0 h0", "")
+    global uidText := myGui.AddText("x0 y0 w0 h0", "")
+    global nicknameText := myGui.AddText("x0 y0 w0 h0", "")
+}
+
+myGui.Show()
 
 ; Make draggable
 myGui.OnEvent("Close", (*) => ExitApp())
@@ -70,7 +165,7 @@ return
 FetchData() {
     global uidText, nicknameText, resinText, resinTimeText
     global dailiesText, realmText, realmTimeText, weeklyText
-    global expeditionText, lastUpdateText, API_URL
+    global expeditionText, lastUpdateText, API_URL, UI_MODE
     
     try {
         ; Use WinHttp - no console window
@@ -99,10 +194,12 @@ FetchData() {
         RegExMatch(json, '"nickname":"([^"]+)"', &nickMatch)
         RegExMatch(json, '"region":"([^"]+)"', &regionMatch)
         
-        if (uidMatch)
-            uidText.Text := "UID: " . uidMatch[1]
-        if (nickMatch && regionMatch)
-            nicknameText.Text := nickMatch[1] . " (" . regionMatch[1] . ")"
+        if (UI_MODE = "full") {
+            if (uidMatch)
+                uidText.Text := "UID: " . uidMatch[1]
+            if (nickMatch && regionMatch)
+                nicknameText.Text := nickMatch[1] . " (" . regionMatch[1] . ")"
+        }
         
         ; Stamina
         RegExMatch(json, '"currentStamina":(\d+)', &currentStam)
@@ -176,6 +273,18 @@ FormatSeconds(seconds) {
         return Format("{} min {} sec", minutes, secs)
     else
         return Format("{} sec", secs)
+}
+
+FormatSecondsShort(seconds) {
+    hours := seconds // 3600
+    minutes := Mod(seconds // 60, 60)
+    
+    if (hours > 0)
+        return Format("{}h{}m", hours, minutes)
+    else if (minutes > 0)
+        return Format("{}m", minutes)
+    else
+        return Format("{}s", seconds)
 }
 
 FormatDateTime(timestamp) {
