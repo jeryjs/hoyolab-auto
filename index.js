@@ -111,7 +111,8 @@ const config = require("./config.js");
 	// Start API server if enabled
 	if (config.api?.enabled) {
 		const { createAPI } = require("./api.js");
-		createAPI(config.api.port || 3000);
+		const port = process.env.PORT || config.api.port || 8080;
+		createAPI(port);
 	}
 
 	process.on("unhandledRejection", (reason) => {

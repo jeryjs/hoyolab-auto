@@ -1,6 +1,6 @@
 const express = require("express");
 
-const createAPI = (port = 3000) => {
+const createAPI = (port = 8080) => {
 	const api = express();
 
 	api.get("/api/genshin/notes", async (req, res) => {
@@ -105,8 +105,8 @@ const createAPI = (port = 3000) => {
         res.status(404).json({ error: "Endpoint not found", available_routes: ["/api/genshin/notes", "/api/genshin/expedition", "/api/genshin/stamina"] });
     });
 
-	const server = api.listen(port, () => {
-		app.Logger.info("API", `Server running on http://localhost:${port}`);
+	const server = api.listen(port, '0.0.0.0', () => {
+		app.Logger.info("API", `Server running on port ${port}`);
 	});
 
 	return server;

@@ -9,7 +9,7 @@ Add this to your `config.json5`:
 ```json5
 api: {
     enabled: true,
-    port: 3000,
+    port: 8080,
 }
 ```
 
@@ -25,7 +25,7 @@ Returns complete notes data including stamina, expedition, dailies, weeklies, an
 
 **Example:**
 ```bash
-curl http://localhost:3000/api/genshin/notes
+curl http://localhost:8080/api/genshin/notes
 ```
 
 **Response:**
@@ -62,7 +62,7 @@ Returns expedition status for all accounts with expedition checking enabled.
 
 **Example:**
 ```bash
-curl http://localhost:3000/api/genshin/expedition
+curl http://localhost:8080/api/genshin/expedition
 ```
 
 **Response:**
@@ -97,7 +97,7 @@ Returns resin/stamina data for all accounts with stamina checking enabled.
 
 **Example:**
 ```bash
-curl http://localhost:3000/api/genshin/stamina
+curl http://localhost:8080/api/genshin/stamina
 ```
 
 **Response:**
