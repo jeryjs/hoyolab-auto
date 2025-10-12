@@ -16,6 +16,6 @@ RUN addgroup -S hoyolab && adduser -S -G hoyolab hoyolab && \
 
 USER hoyolab
 
-ENV TZ=Asia/Shanghai
+ENV TZ=Asia/Kolkata
 
 CMD ["npm", "start"]

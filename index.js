@@ -108,6 +108,12 @@ const config = require("./config.js");
 	const end = process.hrtime.bigint();
 	app.Logger.info("Client", `Initialize completed (${Number(end - start) / 1e6}ms)`);
 
+	// Start API server if enabled
+	if (config.api?.enabled) {
+		const { createAPI } = require("./api.js");
+		createAPI(config.api.port || 3000);
+	}
+
 	process.on("unhandledRejection", (reason) => {
 		if (!(reason instanceof Error)) {
 			return;
