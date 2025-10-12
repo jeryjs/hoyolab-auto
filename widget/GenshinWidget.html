@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Genshin Impact - Daily Notes</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/animejs/3.2.1/anime.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Genshin:wght@400;500;700&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #1a1f3a 0%, #2d1b4e 50%, #1a1f3a 100%); overflow: hidden; height: 100vh; display: flex; justify-content: center; align-items: center; }
+        .widget-container { position: relative; width: 420px; background: linear-gradient(145deg, rgba(28, 32, 58, 0.95), rgba(18, 22, 42, 0.98)); border-radius: 24px; padding: 28px; box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 0 60px rgba(79, 134, 247, 0.15); border: 1px solid rgba(255, 255, 255, 0.08); backdrop-filter: blur(20px); transform-style: preserve-3d; }
+        .widget-container::before { content: ''; position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px; background: linear-gradient(135deg, #4f86f7 0%, #a855f7 50%, #4f86f7 100%); border-radius: 24px; z-index: -1; opacity: 0; transition: opacity 0.5s; filter: blur(8px); }
+        .widget-container:hover::before { opacity: 0.4; }
+        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; position: relative; }
+        .header-left { display: flex; align-items: center; gap: 16px; }
+        .icon-container { position: relative; width: 64px; height: 64px; border-radius: 16px; background: linear-gradient(135deg, #4f86f7 0%, #a855f7 100%); padding: 2px; box-shadow: 0 8px 24px rgba(79, 134, 247, 0.4); animation: iconGlow 3s ease-in-out infinite; }
+        @keyframes iconGlow { 0%, 100% { box-shadow: 0 8px 24px rgba(79, 134, 247, 0.4), 0 0 40px rgba(79, 134, 247, 0.2); } 50% { box-shadow: 0 12px 32px rgba(168, 85, 247, 0.6), 0 0 60px rgba(168, 85, 247, 0.3); } }
+        .icon-inner { width: 100%; height: 100%; border-radius: 14px; background: linear-gradient(135deg, #1a1f3a, #2d1b4e); display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+        .icon-inner img { width: 80%; height: 80%; object-fit: contain; filter: drop-shadow(0 2px 8px rgba(79, 134, 247, 0.5)); }
+        .icon-inner::before { content: ''; position: absolute; width: 200%; height: 200%; background: linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.2) 50%, transparent 70%); animation: shimmer 3s infinite; }
+        @keyframes shimmer { 0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); } 100% { transform: translateX(100%) translateY(100%) rotate(45deg); } }
+        .title-section { flex: 1; }
+        .title { font-size: 24px; font-weight: 700; background: linear-gradient(135deg, #ffd700 0%, #ffed4e 50%, #ffd700 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-shadow: 0 2px 8px rgba(255, 215, 0, 0.4); letter-spacing: 0.5px; margin-bottom: 4px; }
+        .subtitle { font-size: 13px; color: rgba(255, 255, 255, 0.6); display: flex; align-items: center; gap: 8px; }
+        .update-time { color: rgba(168, 85, 247, 0.8); font-weight: 500; }
+        .header-actions { display: flex; gap: 10px; }
+        .action-btn { width: 36px; height: 36px; border-radius: 10px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; font-size: 18px; backdrop-filter: blur(10px); }
+        .action-btn:hover { background: rgba(79, 134, 247, 0.2); border-color: rgba(79, 134, 247, 0.4); transform: translateY(-2px) scale(1.05); box-shadow: 0 6px 20px rgba(79, 134, 247, 0.3); }
+        .action-btn.refresh { color: #4ecdc4; }
+        .action-btn.close { color: #ff6b6b; }
+        .divider { height: 2px; background: linear-gradient(90deg, transparent 0%, rgba(79, 134, 247, 0.3) 50%, transparent 100%); margin: 20px 0; position: relative; overflow: hidden; }
+        .divider::before { content: ''; position: absolute; width: 100px; height: 100%; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent); animation: slideDivider 2s infinite; }
+        @keyframes slideDivider { 0% { left: -100px; } 100% { left: 100%; } }
+        .account-info { display: flex; justify-content: space-between; margin-bottom: 20px; padding: 12px 16px; background: rgba(255, 255, 255, 0.03); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.06); }
+        .account-item { text-align: center; }
+        .account-label { font-size: 11px; color: rgba(255, 255, 255, 0.5); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
+        .account-value { font-size: 14px; color: rgba(255, 255, 255, 0.9); font-weight: 600; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+        .stat-card { position: relative; background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)); border-radius: 16px; padding: 18px; border: 1px solid rgba(255, 255, 255, 0.08); overflow: hidden; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
+        .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: radial-gradient(circle at top right, rgba(79, 134, 247, 0.1), transparent); opacity: 0; transition: opacity 0.4s; }
+        .stat-card:hover { transform: translateY(-4px) scale(1.02); border-color: rgba(79, 134, 247, 0.3); box-shadow: 0 12px 40px rgba(79, 134, 247, 0.2); }
+        .stat-card:hover::before { opacity: 1; }
+        .stat-card.resin { border-color: rgba(22, 199, 154, 0.3); }
+        .stat-card.resin::before { background: radial-gradient(circle at top right, rgba(22, 199, 154, 0.15), transparent); }
+        .stat-card.dailies { border-color: rgba(78, 205, 196, 0.3); }
+        .stat-card.dailies::before { background: radial-gradient(circle at top right, rgba(78, 205, 196, 0.15), transparent); }
+        .stat-card.realm { border-color: rgba(243, 156, 18, 0.3); }
+        .stat-card.realm::before { background: radial-gradient(circle at top right, rgba(243, 156, 18, 0.15), transparent); }
+        .stat-card.weekly { border-color: rgba(231, 76, 60, 0.3); }
+        .stat-card.weekly::before { background: radial-gradient(circle at top right, rgba(231, 76, 60, 0.15), transparent); }
+        .stat-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .stat-icon { font-size: 28px; filter: drop-shadow(0 2px 6px currentColor); animation: iconFloat 3s ease-in-out infinite; }
+        @keyframes iconFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+        .stat-title { font-size: 13px; color: rgba(255, 255, 255, 0.7); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-value { font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 6px; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); }
+        .stat-value .slash { color: rgba(255, 255, 255, 0.4); font-weight: 400; margin: 0 2px; }
+        .progress-bar { height: 6px; background: rgba(0, 0, 0, 0.3); border-radius: 10px; overflow: hidden; margin-bottom: 8px; box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5); }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #4f86f7, #a855f7); border-radius: 10px; transition: width 1s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; }
+        .progress-fill::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent); animation: progressShine 2s infinite; }
+        @keyframes progressShine { 0% { transform: translateX(-100%); } 100% { transform: translateX(200%); } }
+        .resin .progress-fill { background: linear-gradient(90deg, #16c79a, #19e7af); }
+        .dailies .progress-fill { background: linear-gradient(90deg, #4ecdc4, #5ef4e8); }
+        .realm .progress-fill { background: linear-gradient(90deg, #f39c12, #f9ca24); }
+        .weekly .progress-fill { background: linear-gradient(90deg, #e74c3c, #ff6b6b); }
+        .stat-footer { font-size: 12px; color: rgba(255, 255, 255, 0.5); display: flex; align-items: center; gap: 6px; }
+        .stat-footer .icon { font-size: 14px; }
+        .expedition-section { margin-top: 20px; }
+        .expedition-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+        .expedition-title { font-size: 15px; color: rgba(255, 255, 255, 0.8); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .expedition-title .icon { font-size: 22px; color: #9b59b6; filter: drop-shadow(0 2px 6px rgba(155, 89, 182, 0.4)); }
+        .expedition-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+        .expedition-item { position: relative; aspect-ratio: 1; background: linear-gradient(135deg, rgba(155, 89, 182, 0.1), rgba(155, 89, 182, 0.05)); border-radius: 12px; border: 1px solid rgba(155, 89, 182, 0.2); display: flex; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; transition: all 0.3s; cursor: pointer; }
+        .expedition-item::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at center, rgba(155, 89, 182, 0.2), transparent); opacity: 0; transition: opacity 0.3s; }
+        .expedition-item:hover { transform: translateY(-3px) scale(1.05); border-color: rgba(155, 89, 182, 0.5); box-shadow: 0 8px 24px rgba(155, 89, 182, 0.3); }
+        .expedition-item:hover::before { opacity: 1; }
+        .expedition-item.finished { border-color: rgba(22, 199, 154, 0.4); background: linear-gradient(135deg, rgba(22, 199, 154, 0.15), rgba(22, 199, 154, 0.08)); }
+        .expedition-item.finished::before { background: radial-gradient(circle at center, rgba(22, 199, 154, 0.2), transparent); }
+        .expedition-avatar { width: 70%; height: 70%; object-fit: contain; border-radius: 50%; filter: drop-shadow(0 2px 8px rgba(155, 89, 182, 0.4)); }
+        .expedition-status { position: absolute; bottom: 4px; font-size: 9px; color: rgba(255, 255, 255, 0.7); background: rgba(0, 0, 0, 0.6); padding: 2px 6px; border-radius: 8px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .expedition-item.finished .expedition-status { background: rgba(22, 199, 154, 0.3); color: #16c79a; }
+        .particles { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: -1; }
+        .particle { position: absolute; width: 3px; height: 3px; background: radial-gradient(circle, rgba(79, 134, 247, 0.8), transparent); border-radius: 50%; animation: particleFloat 20s infinite; opacity: 0; }
+        @keyframes particleFloat { 0% { transform: translate(0, 100vh) rotate(0deg); opacity: 0; } 10% { opacity: 1; } 90% { opacity: 1; } 100% { transform: translate(100px, -100vh) rotate(360deg); opacity: 0; } }
+        .loading { display: flex; align-items: center; justify-content: center; min-height: 200px; }
+        .spinner { width: 48px; height: 48px; border: 4px solid rgba(79, 134, 247, 0.2); border-top-color: #4f86f7; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error { color: #ff6b6b; text-align: center; padding: 20px; background: rgba(255, 107, 107, 0.1); border-radius: 12px; border: 1px solid rgba(255, 107, 107, 0.3); }
+    </style>
+</head>
+
+<body>
+    <div class="particles" id="particles"></div>
+    <div class="widget-container" id="widget">
+        <div class="header">
+            <div class="header-left">
+                <div class="icon-container">
+                    <div class="icon-inner">
+                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0%25' style='stop-color:%234f86f7'/%3E%3Cstop offset='100%25' style='stop-color:%23a855f7'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath fill='url(%23g)' d='M50 10 L90 30 L90 70 L50 90 L10 70 L10 30 Z'/%3E%3Cpath fill='%23fff' opacity='0.9' d='M50 25 L70 35 L70 55 L50 65 L30 55 L30 35 Z'/%3E%3C/svg%3E"
+                            alt="Genshin">
+                    </div>
+                </div>
+                <div class="title-section">
+                    <div class="title">Genshin Impact</div>
+                    <div class="subtitle">Daily Notes <span class="update-time" id="updateTime">--:--</span></div>
+                </div>
+            </div>
+            <div class="header-actions">
+                <div class="action-btn refresh" onclick="fetchData()">🔄</div>
+                <div class="action-btn close" onclick="window.close()">✕</div>
+            </div>
+        </div>
+        <div class="divider"></div>
+        <div class="account-info">
+            <div class="account-item">
+                <div class="account-label">UID</div>
+                <div class="account-value" id="uid">Loading...</div>
+            </div>
+            <div class="account-item">
+                <div class="account-label">Traveler</div>
+                <div class="account-value" id="nickname">--</div>
+            </div>
+            <div class="account-item">
+                <div class="account-label">Region</div>
+                <div class="account-value" id="region">--</div>
+            </div>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-card resin" data-stat="resin">
+                <div class="stat-header">
+                    <div class="stat-icon">⚡</div>
+                    <div class="stat-title">Original Resin</div>
+                </div>
+                <div class="stat-value"><span id="resinCurrent">0</span><span class="slash">/</span><span
+                        id="resinMax">200</span></div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="resinProgress" style="width: 0%"></div>
+                </div>
+                <div class="stat-footer"><span class="icon">⏱</span><span id="resinTime">Calculating...</span></div>
+            </div>
+            <div class="stat-card dailies" data-stat="dailies">
+                <div class="stat-header">
+                    <div class="stat-icon">📋</div>
+                    <div class="stat-title">Daily Commissions</div>
+                </div>
+                <div class="stat-value"><span id="dailiesTask">0</span><span class="slash">/</span><span
+                        id="dailiesMax">4</span></div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="dailiesProgress" style="width: 0%"></div>
+                </div>
+                <div class="stat-footer"><span id="dailiesStatus">Incomplete</span></div>
+            </div>
+            <div class="stat-card realm" data-stat="realm">
+                <div class="stat-header">
+                    <div class="stat-icon">🏠</div>
+                    <div class="stat-title">Realm Currency</div>
+                </div>
+                <div class="stat-value"><span id="realmCurrent">0</span><span class="slash">/</span><span
+                        id="realmMax">2400</span></div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="realmProgress" style="width: 0%"></div>
+                </div>
+                <div class="stat-footer"><span class="icon">⏱</span><span id="realmTime">Calculating...</span></div>
+            </div>
+            <div class="stat-card weekly" data-stat="weekly">
+                <div class="stat-header">
+                    <div class="stat-icon">⚔️</div>
+                    <div class="stat-title">Weekly Bosses</div>
+                </div>
+                <div class="stat-value"><span id="weeklyUsed">0</span><span class="slash">/</span><span
+                        id="weeklyMax">3</span></div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="weeklyProgress" style="width: 0%"></div>
+                </div>
+                <div class="stat-footer"><span id="weeklyStatus">Discounts Available</span></div>
+            </div>
+        </div>
+        <div class="expedition-section">
+            <div class="expedition-header">
+                <div class="expedition-title"><span class="icon">🗺️</span>Expeditions <span id="expCount"
+                        style="opacity: 0.6; font-size: 13px;">(0/5)</span></div>
+            </div>
+            <div class="expedition-grid" id="expeditionGrid"></div>
+        </div>
+    </div>
+    <script>
+        const API_URL = 'http://localhost:6326/api/genshin/notes';
+        const UPDATE_INTERVAL = 60000;
+        function createParticles() {
+            const container = document.getElementById('particles');
+            for (let i = 0; i < 30; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 20 + 's';
+                particle.style.animationDuration = (15 + Math.random() * 10) + 's';
+                container.appendChild(particle);
+            }
+        }
+        function formatTime(seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            if (hours > 0) return `${hours}h ${minutes}m`;
+            if (minutes > 0) return `${minutes}m`;
+            return `${seconds}s`;
+        }
+        function animateValue(element, start, end, duration = 1000) {
+            const range = end - start;
+            const increment = range / (duration / 16);
+            let current = start;
+            const timer = setInterval(() => {
+                current += increment;
+                if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
+                    current = end;
+                    clearInterval(timer);
+                }
+                element.textContent = Math.floor(current);
+            }, 16);
+        }
+        function updateProgress(element, percent, delay = 0) {
+            setTimeout(() => {
+                anime({
+                    targets: element,
+                    width: percent + '%',
+                    easing: 'easeOutCubic',
+                    duration: 1500
+                });
+            }, delay);
+        }
+        function animateCard(card, delay) {
+            anime({
+                targets: card,
+                translateY: [30, 0],
+                opacity: [0, 1],
+                easing: 'easeOutCubic',
+                duration: 800,
+                delay: delay
+            });
+        }
+        async function fetchData() {
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                if (!data.success || !data.data || data.data.length === 0) {
+                    throw new Error('No data available');
+                }
+                const account = data.data[0];
+                document.getElementById('updateTime').textContent = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                document.getElementById('uid').textContent = account.uid;
+                document.getElementById('nickname').textContent = account.nickname;
+                document.getElementById('region').textContent = account.region.replace('os_', '').toUpperCase();
+                const resinPercent = (account.stamina.currentStamina / account.stamina.maxStamina) * 100;
+                animateValue(document.getElementById('resinCurrent'), 0, account.stamina.currentStamina);
+                document.getElementById('resinMax').textContent = account.stamina.maxStamina;
+                updateProgress(document.getElementById('resinProgress'), resinPercent, 100);
+                document.getElementById('resinTime').textContent = account.stamina.recoveryTime > 0 ? 'Full in ' + formatTime(account.stamina.recoveryTime) : 'Full';
+                const dailiesPercent = (account.dailies.task / account.dailies.maxTask) * 100;
+                animateValue(document.getElementById('dailiesTask'), 0, account.dailies.task);
+                document.getElementById('dailiesMax').textContent = account.dailies.maxTask;
+                updateProgress(document.getElementById('dailiesProgress'), dailiesPercent, 200);
+                document.getElementById('dailiesStatus').textContent = account.dailies.task === account.dailies.maxTask ? 'Complete!' : 'Incomplete';
+                const realmPercent = (account.realm.currentCoin / account.realm.maxCoin) * 100;
+                animateValue(document.getElementById('realmCurrent'), 0, account.realm.currentCoin);
+                document.getElementById('realmMax').textContent = account.realm.maxCoin;
+                updateProgress(document.getElementById('realmProgress'), realmPercent, 300);
+                document.getElementById('realmTime').textContent = account.realm.recoveryTime > 0 ? 'Full in ' + formatTime(account.realm.recoveryTime) : 'Full';
+                const weeklyPercent = (account.weeklies.resinDiscount / account.weeklies.resinDiscountLimit) * 100;
+                animateValue(document.getElementById('weeklyUsed'), 0, account.weeklies.resinDiscount);
+                document.getElementById('weeklyMax').textContent = account.weeklies.resinDiscountLimit;
+                updateProgress(document.getElementById('weeklyProgress'), weeklyPercent, 400);
+                document.getElementById('weeklyStatus').textContent = account.weeklies.resinDiscount === 0 ? 'All Used' : 'Discounts Available';
+                const expeditionGrid = document.getElementById('expeditionGrid');
+                expeditionGrid.innerHTML = '';
+                let finishedCount = 0;
+                account.expedition.list.forEach((exp, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'expedition-item' + (exp.status === 'Finished' ? ' finished' : '');
+                    if (exp.status === 'Finished') finishedCount++;
+                    const avatar = document.createElement('img');
+                    avatar.className = 'expedition-avatar';
+                    avatar.src = exp.avatar;
+                    avatar.onerror = () => avatar.style.display = 'none';
+                    const status = document.createElement('div');
+                    status.className = 'expedition-status';
+                    status.textContent = exp.status === 'Finished' ? '✓' : formatTime(exp.remaining_time);
+                    item.appendChild(avatar);
+                    item.appendChild(status);
+                    expeditionGrid.appendChild(item);
+                    anime({
+                        targets: item,
+                        scale: [0, 1],
+                        opacity: [0, 1],
+                        easing: 'easeOutElastic(1, .6)',
+                        duration: 800,
+                        delay: 500 + (index * 100)
+                    });
+                });
+                document.getElementById('expCount').textContent = `(${finishedCount}/${account.expedition.list.length})`;
+                document.querySelectorAll('.stat-card').forEach((card, index) => {
+                    animateCard(card, index * 100);
+                });
+                anime({
+                    targets: '.widget-container',
+                    scale: [0.95, 1],
+                    opacity: [0.8, 1],
+                    easing: 'easeOutCubic',
+                    duration: 600
+                });
+            } catch (error) {
+                console.error('Error fetching data:', error);
+                document.querySelector('.widget-container').innerHTML = '<div class="error">Failed to load data. Please check if the API is running.</div>';
+            }
+        }
+        createParticles();
+        fetchData();
+        setInterval(fetchData, UPDATE_INTERVAL);
+        document.querySelectorAll('.stat-card').forEach(card => {
+            card.addEventListener('mouseenter', () => {
+                anime({
+                    targets: card.querySelector('.stat-icon'),
+                    scale: [1, 1.2],
+                    rotate: [0, 10],
+                    easing: 'easeOutElastic(1, .6)',
+                    duration: 600
+                });
+            });
+            card.addEventListener('mouseleave', () => {
+                anime({
+                    targets: card.querySelector('.stat-icon'),
+                    scale: [1.2, 1],
+                    rotate: [10, 0],
+                    easing: 'easeOutElastic(1, .6)',
+                    duration: 600
+                });
+            });
+        });
+    </script>
+</body>
+
+</html>
