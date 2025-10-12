@@ -17,5 +17,6 @@ RUN addgroup -S hoyolab && adduser -S -G hoyolab hoyolab && \
 USER hoyolab
 
 ENV TZ=Asia/Kolkata
+ENV PORT=8080
 
 CMD ["npm", "start"]
