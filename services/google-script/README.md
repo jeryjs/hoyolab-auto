@@ -18,37 +18,8 @@
    - [Zenless Zone Zero](https://act.hoyolab.com/bbs/event/signin/zzz/e202406031448091.html?act_id=e202406031448091)
 
 2. **Getting the Cookie:**
-
-   **Method 1 (Check-in Only):**
-> [!WARNING]
-> This method will only work for daily check-ins. For both check-in and code redemption features, use Method 2 below.
-
-   - When you are at the check-in page, open the developer console (F12) and go to the "Network" tab (refresh the page if needed).
-   - Find the `home` request and click it.
-
-     ![image](https://github.com/torikushiii/hoyolab-auto/assets/21153445/672051f5-26a8-4be0-9403-fca30ac3986c)
-
-   - Scroll down to the "Request Headers" section and select everything under "cookie" to use in step 2.
-
-     ![image](https://github.com/torikushiii/hoyolab-auto/assets/21153445/e4cb8259-aef4-4b2c-9d88-78e30a03b05c)
-
-   **Method 2 (Check-in and Code Redemption):**
-> [!NOTE]
-> This method is recommended if you want to use both check-in and code redemption features.
-
-   1. Go to your [HoyoLab profile](https://www.hoyolab.com/accountCenter/postList) and log in with your Hoyoverse account.
-   2. Open the browser console by pressing `F12`.
-   3. Navigate to the **Network** tab.
-
-      ![Network Tab](https://github.com/user-attachments/assets/d161d859-7575-4740-b0dd-72b3f637e7c7)
-
-   4. Search for `getGameRecordCard` in the network requests and click on the result. (If you don't see anything, refresh the page while keeping the browser console open)
-
-      ![image](https://github.com/user-attachments/assets/45e6b302-3c33-4af1-b426-4fb6298fbe80)
-
-   5. Go to the **Headers** tab and scroll down to find **Request Headers**. Copy all the cookie values.
-
-      ![image](https://github.com/user-attachments/assets/283c43eb-20bd-47e9-9751-1bc7cc852025)
+   - Follow the [HoyoLab Cookie Extraction Guide](https://gist.github.com/torikushiii/59eff33fc8ea89dbc0b2e7652db9d3fd) to obtain the cookie required for both daily check-ins and code redemption.
+   - Use an incognito/private browsing window as recommended in the guide to ensure you copy the correct account's cookie.
 
 ### 2. Setup in Google Apps Script
 
@@ -89,6 +60,24 @@
        }
      };
      ```
+
+   - **Discord notifications (optional):** Set `DISCORD_WEBHOOK` to your webhook URL to get a Discord message for every check-in.
+
+     ```javascript
+     const DISCORD_WEBHOOK = "https://discord.com/api/webhooks/...";
+     ```
+
+   - **Automatic code redemption (optional):** Set `enableCodeRedemption` to `true` to redeem new codes after checking in. Not supported for Honkai Impact 3rd.
+
+     ```javascript
+     const config = {
+       enableCodeRedemption: true,  // redeem new codes automatically
+       notifyOnRedeemFailure: false, // also report codes that failed to redeem
+       // ...
+     };
+     ```
+
+     When `DISCORD_WEBHOOK` is set, one summary message is sent per account listing the codes that were redeemed and the rewards they granted. Nothing is sent when there are no new codes. Turn on `notifyOnRedeemFailure` if you also want to hear about codes that failed - this includes a link to redeem them manually. Codes that fail for a temporary reason (expired cookie, redemption cooldown, network errors) are retried on the next run; expired, invalid, and already-used codes are not.
 
    - **Save the Project:** Click on the floppy disk icon to save your project.
 

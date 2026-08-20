@@ -1,5 +1,6 @@
 const config = {
 	enableCodeRedemption: false, // Set to true to enable automatic code redemption
+	notifyOnRedeemFailure: false, // Set to true to also report codes that failed to redeem
 	genshin: {
 		data: [
 			// "account_cookie_1",
@@ -54,6 +55,10 @@ function viewAllRedeemedCodes () {
 }
 
 const DISCORD_WEBHOOK = null; // Replace with your Discord webhook URL (optional)
+const DISCORD_EMBEDS_PER_MESSAGE = 10; // Discord's hard limit per webhook message
+const DISCORD_MAX_MESSAGE_CHARS = 6000; // combined embed text allowed in one message
+const DISCORD_MAX_RETRIES = 5;
+const DISCORD_MAX_BACKOFF_MS = 60000;
 const DEFAULT_CONSTANTS = {
 	genshin: {
 		ACT_ID: "e202102251931481",
@@ -124,6 +129,28 @@ const DEFAULT_CONSTANTS = {
 		}
 	}
 };
+
+// Web redemption pages, used to offer a manual fallback when redemption fails
+const REDEMPTION_LINKS = {
+	genshin: "https://genshin.hoyoverse.com/en/gift",
+	starrail: "https://hsr.hoyoverse.com/gift",
+	zenless: "https://zenless.hoyoverse.com/redemption"
+};
+
+const REDEEM_ERROR_MESSAGES = {
+	"-1071": "The provided cookie is either invalid or expired.",
+	"-2001": "The code has expired",
+	"-2003": "The code is invalid",
+	"-2016": "Redemption is in cooldown",
+	"-2017": "The code has been used"
+};
+
+// Failures worth attempting again on the next run. Anything not listed here is
+// treated as final so we stop hammering the API with a code that will never work.
+const RETRYABLE_REDEEM_RETCODES = [
+	-1071, // cookie invalid or expired
+	-2016 // redemption cooldown
+];
 
 class Game {
 	/**
@@ -404,6 +431,7 @@ class Game {
 	async redeemCodes (account) {
 		const codes = await this.fetchCodes();
 		const redeemedCodes = this.getRedeemedCodes();
+		const results = [];
 
 		for (const code of codes) {
 			if (redeemedCodes.includes(code.code)) {
@@ -411,24 +439,35 @@ class Game {
 				continue;
 			}
 
-			await this.redeemCode(account, code.code);
+			const result = await this.redeemCode(account, code);
 			Utilities.sleep(6000);
 
-			this.saveRedeemedCode(code.code);
+			results.push(result);
+
+			// Only stop retrying a code once we know the outcome is final. Transient
+			// failures (bad cookie, cooldown, network errors) are left unsaved so the
+			// next run picks them up again.
+			if (!result.retryable) {
+				this.saveRedeemedCode(code.code);
+			}
 		}
+
+		return results;
 	}
 
 	// Force redemption of all codes regardless of previous redemption status
 	async forceRedeemCodes (account) {
 		const codes = await this.fetchCodes();
+		const results = [];
 
 		for (const code of codes) {
 			console.log(`Attempting to redeem code ${code.code} for ${this.fullName}`);
-			await this.redeemCode(account, code.code);
+			results.push(await this.redeemCode(account, code));
 			Utilities.sleep(6000);
 		}
 
 		console.log(`Completed forced code redemption for ${this.fullName}`);
+		return results;
 	}
 
 	async fetchCodes () {
@@ -448,10 +487,16 @@ class Game {
 		}
 	}
 
-	async redeemCode (account, code) {
+	async redeemCode (account, codeEntry) {
+		const code = typeof codeEntry === "string" ? codeEntry : codeEntry.code;
+		const rewards = (typeof codeEntry === "object" && Array.isArray(codeEntry.rewards))
+			? codeEntry.rewards
+			: [];
+
 		const url = this.getRedemptionUrl(account, code);
 		const options = {
 			method: this.name === "starrail" ? "POST" : "GET",
+			muteHttpExceptions: true,
 			headers: {
 				"User-Agent": this.userAgent,
 				Cookie: account.cookie
@@ -460,6 +505,19 @@ class Game {
 
 		try {
 			const response = await UrlFetchApp.fetch(url, options);
+			const statusCode = response.getResponseCode();
+
+			if (statusCode !== 200) {
+				console.error(`Code ${code} redemption for ${this.fullName} returned status ${statusCode}`);
+				return {
+					code,
+					rewards,
+					success: false,
+					retryable: true,
+					message: `Request failed with status ${statusCode}`
+				};
+			}
+
 			const data = JSON.parse(response.getContentText());
 
 			// Check for authentication errors and other failures
@@ -470,13 +528,34 @@ class Game {
 				else {
 					console.error(`Code ${code} redemption failed for ${this.fullName}:`, data);
 				}
+
+				return {
+					code,
+					rewards,
+					success: false,
+					retryable: RETRYABLE_REDEEM_RETCODES.includes(data.retcode),
+					message: REDEEM_ERROR_MESSAGES[data.retcode] || data.message || `Unknown error (retcode ${data.retcode})`
+				};
 			}
-			else {
-				console.log(`Code ${code} successfully redeemed for ${this.fullName}:`, data);
-			}
+
+			console.log(`Code ${code} successfully redeemed for ${this.fullName}:`, data);
+			return {
+				code,
+				rewards,
+				success: true,
+				retryable: false,
+				message: "Code redeemed successfully!"
+			};
 		}
 		catch (e) {
 			console.error(`Error redeeming code ${code} for ${this.fullName}:`, e);
+			return {
+				code,
+				rewards,
+				success: false,
+				retryable: true,
+				message: e.message
+			};
 		}
 	}
 
@@ -550,6 +629,10 @@ class Game {
 		}
 	}
 
+	getRedemptionLink () {
+		return REDEMPTION_LINKS[this.name] || null;
+	}
+
 	getRedeemedCodes () {
 		const redeemedCodes = PropertiesService.getScriptProperties().getProperty(`${this.name}_redeemed_codes`);
 		return redeemedCodes ? JSON.parse(redeemedCodes) : [];
@@ -580,6 +663,8 @@ function checkInGame (gameName) {
 		.then(async (successes) => {
 			console.log(`Successful check-ins for ${gameName}:`, successes);
 
+			const redeemReports = [];
+
 			// Only attempt code redemption if enabled in config
 			if (config.enableCodeRedemption) {
 				for (const success of successes) {
@@ -587,7 +672,12 @@ function checkInGame (gameName) {
 						continue;
 					}
 
-					await game.redeemCodes(success.account);
+					const results = await game.redeemCodes(success.account);
+					redeemReports.push({
+						account: success.account,
+						assets: success.assets,
+						results
+					});
 				}
 			}
 			else {
@@ -595,7 +685,13 @@ function checkInGame (gameName) {
 			}
 
 			if (DISCORD_WEBHOOK) {
-				return Promise.all(successes.map(sendDiscordNotification));
+				const embeds = successes.filter(Boolean).map(buildCheckInEmbed);
+
+				for (const report of redeemReports) {
+					embeds.push(buildCodeRedeemEmbed(game, report.account, report.assets, report.results));
+				}
+
+				postDiscordEmbeds(embeds.filter(Boolean), game.config.assets);
 			}
 			return successes;
 		})
@@ -605,8 +701,12 @@ function checkInGame (gameName) {
 		});
 }
 
-function sendDiscordNotification (success) {
-	const embed = {
+function buildCheckInEmbed (success) {
+	if (!success) {
+		return null;
+	}
+
+	return {
 		color: 16748258,
 		title: `${success.assets.game} Daily Check-In`,
 		author: {
@@ -658,16 +758,209 @@ function sendDiscordNotification (success) {
 			text: `${success.assets.game} Daily Check-In`
 		}
 	};
+}
 
-	UrlFetchApp.fetch(DISCORD_WEBHOOK, {
+function embedLength (embed) {
+	let length = (embed.title || "").length + (embed.footer?.text || "").length + (embed.author?.name || "").length;
+
+	for (const field of embed.fields || []) {
+		length += field.name.length + String(field.value).length;
+	}
+
+	return length;
+}
+
+function chunkEmbeds (embeds) {
+	const chunks = [];
+	let current = [];
+	let used = 0;
+
+	for (const embed of embeds) {
+		const length = embedLength(embed);
+
+		if (current.length > 0 && (current.length >= DISCORD_EMBEDS_PER_MESSAGE || used + length > DISCORD_MAX_MESSAGE_CHARS)) {
+			chunks.push(current);
+			current = [];
+			used = 0;
+		}
+
+		current.push(embed);
+		used += length;
+	}
+
+	if (current.length > 0) {
+		chunks.push(current);
+	}
+
+	return chunks;
+}
+
+function postDiscordEmbeds (embeds, assets) {
+	if (!DISCORD_WEBHOOK || !Array.isArray(embeds) || embeds.length === 0) {
+		return;
+	}
+
+	for (const chunk of chunkEmbeds(embeds)) {
+		postDiscordPayload({
+			embeds: chunk,
+			username: assets.author,
+			avatar_url: assets.icon
+		});
+	}
+}
+
+function postDiscordPayload (payload) {
+	const options = {
 		method: "POST",
 		contentType: "application/json",
-		payload: JSON.stringify({
-			embeds: [embed],
-			username: success.assets.author,
-			avatar_url: success.assets.icon
-		})
-	});
+		muteHttpExceptions: true,
+		payload: JSON.stringify(payload)
+	};
+
+	const url = `${DISCORD_WEBHOOK}?wait=true`;
+	for (let attempt = 0; attempt <= DISCORD_MAX_RETRIES; attempt++) {
+		const response = UrlFetchApp.fetch(url, options);
+		const statusCode = response.getResponseCode();
+
+		if (statusCode < 300) {
+			throttleFromHeaders(response);
+			return true;
+		}
+
+		if (statusCode !== 429) {
+			console.error("Discord webhook failed", statusCode, response.getContentText());
+			return false;
+		}
+
+		const wait = getRetryAfterMs(response, attempt);
+		console.warn(`Discord rate limited (attempt ${attempt + 1}/${DISCORD_MAX_RETRIES}), waiting ${wait}ms`);
+		Utilities.sleep(wait);
+	}
+
+	console.error("Discord webhook gave up after repeated 429 responses.");
+	return false;
+}
+
+function getDiscordHeader (response, name) {
+	const headers = response.getAllHeaders();
+	const key = Object.keys(headers).find(header => header.toLowerCase() === name.toLowerCase());
+	if (!key) {
+		return null;
+	}
+
+	const value = headers[key];
+	return Array.isArray(value) ? value[0] : value;
+}
+
+function getRetryAfterMs (response, attempt) {
+	let seconds = Number.parseFloat(getDiscordHeader(response, "Retry-After"));
+
+	if (!Number.isFinite(seconds)) {
+		try {
+			seconds = Number.parseFloat(JSON.parse(response.getContentText()).retry_after);
+		}
+		catch (e) {
+			seconds = Number.NaN;
+		}
+	}
+
+	const backoff = Number.isFinite(seconds) ? seconds * 1000 : 2 ** attempt * 1000;
+	return Math.min(backoff + Math.random() * 500, DISCORD_MAX_BACKOFF_MS);
+}
+
+function throttleFromHeaders (response) {
+	if (getDiscordHeader(response, "X-RateLimit-Remaining") !== "0") {
+		return;
+	}
+
+	const resetAfter = Number.parseFloat(getDiscordHeader(response, "X-RateLimit-Reset-After"));
+	if (Number.isFinite(resetAfter) && resetAfter > 0) {
+		Utilities.sleep(Math.min(resetAfter * 1000 + 250, DISCORD_MAX_BACKOFF_MS));
+	}
+}
+
+// Joins one line per code, staying inside Discord's 1024 character field limit.
+function formatCodeLines (entries, formatter) {
+	const FIELD_LIMIT = 1024;
+	const lines = [];
+	let used = 0;
+
+	for (const entry of entries) {
+		const line = formatter(entry);
+		const suffix = `\n…and ${entries.length - lines.length} more`;
+
+		if (used + line.length + 1 > FIELD_LIMIT - suffix.length) {
+			lines.push(suffix.trim());
+			break;
+		}
+
+		lines.push(line);
+		used += line.length + 1;
+	}
+
+	return lines.join("\n");
+}
+
+function truncate (text, limit) {
+	return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
+}
+
+function buildCodeRedeemEmbed (game, account, assets, results) {
+	if (!DISCORD_WEBHOOK || !Array.isArray(results) || results.length === 0) {
+		return null;
+	}
+
+	const redeemed = results.filter(result => result.success);
+	const failed = config.notifyOnRedeemFailure ? results.filter(result => !result.success) : [];
+
+	// Nothing new happened for this account - stay quiet rather than sending an empty report.
+	if (redeemed.length === 0 && failed.length === 0) {
+		return null;
+	}
+
+	const fields = [];
+
+	if (redeemed.length > 0) {
+		fields.push({
+			name: `Redeemed (${redeemed.length})`,
+			value: formatCodeLines(redeemed, (result) => (result.rewards.length > 0
+				? `\`${result.code}\` — ${truncate(result.rewards.join(", "), 200)}`
+				: `\`${result.code}\``)),
+			inline: false
+		});
+	}
+
+	if (failed.length > 0) {
+		const redeemLink = game.getRedemptionLink();
+
+		fields.push({
+			name: `Failed (${failed.length})`,
+			value: formatCodeLines(failed, result => `\`${result.code}\` — ${truncate(result.message, 150)}`),
+			inline: false
+		});
+
+		if (redeemLink) {
+			fields.push({
+				name: "Manually Redeem Here",
+				value: redeemLink,
+				inline: false
+			});
+		}
+	}
+
+	return {
+		color: 5793266,
+		title: `${assets.game} Code Redemption`,
+		author: {
+			name: `${account.uid} - ${account.nickname}`,
+			icon_url: assets.icon
+		},
+		fields,
+		timestamp: new Date(),
+		footer: {
+			text: `${assets.game} Code Redemption`
+		}
+	};
 }
 
 function checkInAllGames () {
@@ -710,6 +1003,7 @@ function manuallyRedeemCodes (gameName, forceRedeem = false) {
 		return Promise.resolve({ success: false, message: `No ${gameName} accounts provided` });
 	}
 
+	const embeds = [];
 	return Promise.all(accounts.map(async (cookieData) => {
 		try {
 			const ltuid = cookieData.match(/ltuid(?:|_v2)=([^;]+)/)[1];
@@ -729,20 +1023,29 @@ function manuallyRedeemCodes (gameName, forceRedeem = false) {
 
 			console.log(`Redeeming codes for ${gameName} account: ${account.nickname} (${account.uid})`);
 
-			if (forceRedeem) {
-				await game.forceRedeemCodes(account);
-				return { success: true, account, message: `Force redeemed all codes for ${account.nickname} (${account.uid})` };
+			const results = forceRedeem
+				? await game.forceRedeemCodes(account)
+				: await game.redeemCodes(account);
+
+			const embed = buildCodeRedeemEmbed(game, account, game.config.assets, results);
+			if (embed) {
+				embeds.push(embed);
 			}
-			else {
-				await game.redeemCodes(account);
-				return { success: true, account, message: `Redeemed new codes for ${account.nickname} (${account.uid})` };
-			}
+
+			const message = forceRedeem
+				? `Force redeemed all codes for ${account.nickname} (${account.uid})`
+				: `Redeemed new codes for ${account.nickname} (${account.uid})`;
+
+			return { success: true, account, results, message };
 		}
 		catch (e) {
 			console.error(`Error redeeming codes for ${gameName}:`, e);
 			return { success: false, message: e.message };
 		}
-	}));
+	})).then((results) => {
+		postDiscordEmbeds(embeds, game.config.assets);
+		return results;
+	});
 }
 
 function redeemGenshinCodes () {
