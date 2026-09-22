@@ -42,6 +42,9 @@ If you don't have a server to run this script and simply just want to use it for
 - [x] Zenless Zone Zero
 
 ## Features
+Daily reminders use game server time by default. Set `crons.dailiesReminderTimeZone`
+to an IANA timezone such as `America/New_York` to use local time with daylight-saving changes.
+
 - **Honkai Impact 3rd**:
   - **Daily check-in**: Runs every midnight local time.
 
@@ -50,7 +53,7 @@ If you don't have a server to run this script and simply just want to use it for
 
 - **Genshin Impact**:
   - **Daily check-in**: Runs every midnight local time.
-  - **Dailies**: Reminds you to do your dailies, such as commissions if you haven't done them at 09:00 (local time).
+  - **Dailies**: Reminds you to do your dailies at the configured time (21:00 game server time by default).
   - **Weeklies**: Reminds you to do your weekly bosses/discounted resin if you haven't done them at 09:00 (local time).
   - **Stamina check**: Reminds you to spend your resin if you're at your set threshold or capped.
   - **Expedition check**: Check your expeditions and sends a notification if they're done.
@@ -59,7 +62,7 @@ If you don't have a server to run this script and simply just want to use it for
   - **Traveler's Diary**: Check your monthly currency income.
 - **Honkai: Star Rail**:
   - **Daily check-in**: Runs every midnight local time.
-  - **Dailies**: Reminds you to do your dailies, such as commissions if you haven't done them at 09:00 (local time).
+  - **Dailies**: Reminds you to do your dailies at the configured time (21:00 game server time by default).
   - **Stamina check**: Reminds you to spend your stamina if you're at your set threshold or capped.
   - **Expedition check**: Check your expeditions and sends a notification if they're done.
   - **Code Redeems**: Search for codes and redeem them automatically.
@@ -67,9 +70,9 @@ If you don't have a server to run this script and simply just want to use it for
   - **Traveling Mimo**: Automatically complete Mimo tasks, claim points, and exchange for Stellar Jade.
 - **Zenless Zone Zero**:
   - **Daily check-in**: Runs every midnight local time.
-  - **Dailies**: Reminds you to do your dailies, such as commissions if you haven't done them at 09:00 (local time).
+  - **Dailies**: Reminds you to do your dailies at the configured time (21:00 game server time by default).
   - **Stamina check**: Reminds you to spend your stamina if you're at your set threshold or capped.
-  - **Howl Scracth Card**: Notifies you if you haven't scratched the card for the day at 09:00 (local time).
+  - **Daily Lottery**: Notifies you at 21:00 game server time if you haven't claimed the daily lottery reward. Set `dailyLotteryCheck` to `false` on a ZZZ account to disable it.
   - **Shop Status**: Notifies you if the shop has finished selling videos.
   - **Code Redeems**: Search for codes and redeem them automatically.
   - **Traveling Mimo**: Automatically complete Mimo tasks, claim points, and exchange for Polychrome.
@@ -163,6 +166,15 @@ node convert.js
 
 ## Usage
 For a detailed usage guide, refer to this gist: [Cookie Guide](https://gist.github.com/torikushiii/59eff33fc8ea89dbc0b2e7652db9d3fd).
+
+If your cookie also contains `stoken`, HoyoLab Auto uses it to refresh
+`ltoken_v2` and `cookie_token_v2` on startup and every two hours. Keep the
+configured cookie private; `stoken` is not sent with regular HoYoLAB requests.
+Only one game entry needs it when several games use the same HoYoLAB account.
+Browser sessions do not normally expose `stoken`; it must come from an app login.
+The optional [HoYoLAB cookie helper](https://github.com/Smexhy/hoyolab-cookie-helper)
+can obtain it locally on Windows, macOS, or Linux. It is a third-party helper
+and is only needed for automatic cookie refresh.
 
 ## Notifications Setup
 For setting up Discord or Telegram notifications, refer to the [setup folder](https://github.com/torikushiii/hoyolab-auto/tree/main/setup).

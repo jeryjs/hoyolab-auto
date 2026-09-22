@@ -84,7 +84,8 @@ const redeemCodes = async (accountData, code) => {
 
 		return {
 			success: false,
-			reason: "Expired or invalid code"
+			reason: "Expired or invalid code",
+			retcode
 		};
 	}
 
@@ -92,7 +93,8 @@ const redeemCodes = async (accountData, code) => {
 		app.Logger.info(`CodeRedeem:Genshin:${accountData.uid}`, `${code.code} - ${res.body.message}`);
 		return {
 			success: false,
-			reason: res.body.message
+			reason: res.body.message,
+			retcode
 		};
 	}
 

@@ -1,4 +1,5 @@
 const { setTimeout } = require("node:timers/promises");
+const crypto = require("node:crypto");
 
 const GAME_CONFIG = [
 	{
@@ -56,21 +57,31 @@ const REDEMPTION_LINKS = GAME_CONFIG.reduce((acc, game) => {
 }, {});
 
 const DEFAULT_MANUAL_REASON = "Redeem this code from within the game client.";
+const FINAL_REDEMPTION_ERRORS = new Set([-2001, -2003, -2017]);
 
 const toUpperCase = (value) => String(value).toUpperCase();
 const formatCodeValue = (code) => String(code?.code ?? "").toUpperCase();
+
+const getRedemptionCookieHash = (account) => {
+	const cookie = app.HoyoLab.parseCookie(account.cookie, {
+		whitelist: ["cookie_token_v2", "account_mid_v2", "account_id_v2", "cookie_token", "account_id"]
+	});
+	const normalized = cookie.split(";").map(pair => pair.trim()).sort()
+		.join(";");
+	return crypto.createHash("sha256").update(normalized).digest("hex");
+};
 
 const getCachedCodes = async (cacheKey) => {
 	const cachedCodes = await app.Cache.get(cacheKey);
 	return Array.isArray(cachedCodes) ? cachedCodes.map(toUpperCase) : [];
 };
 
-const appendCodesToCache = async (game, codes) => {
+const appendCodesToCache = async (cacheKey, codes) => {
 	if (!Array.isArray(codes) || codes.length === 0) {
 		return;
 	}
 
-	const existingCodes = await getCachedCodes(game.cacheKey);
+	const existingCodes = await getCachedCodes(cacheKey);
 	const codeSet = new Set(existingCodes);
 
 	let hasUpdates = false;
@@ -93,7 +104,7 @@ const appendCodesToCache = async (game, codes) => {
 	}
 
 	await app.Cache.set({
-		key: game.cacheKey,
+		key: cacheKey,
 		value: Array.from(codeSet)
 	});
 };
@@ -165,19 +176,67 @@ const checkAndRedeem = async (codes) => {
 				}
 			}
 
-			await appendCodesToCache(game, pendingCodes);
+			await appendCodesToCache(game.cacheKey, pendingCodes);
 			continue;
 		}
 
 		const { redeemCodes } = require(game.modulePath);
+		const completedByAccount = [];
 
 		for (const account of accounts) {
 			if (account.redeemCode === false) {
 				continue;
 			}
 
+			const accountCacheKey = `${game.cacheKey}:${account.region}:${account.uid}`;
+			const completedCodes = new Set(await getCachedCodes(accountCacheKey));
+			completedByAccount.push(completedCodes);
+			const loginCacheKey = `${accountCacheKey}:expired-login`;
+			const pausedCookieHash = await app.Cache.get(loginCacheKey);
+			if (pausedCookieHash) {
+				if (pausedCookieHash === getRedemptionCookieHash(account)) {
+					failed.push({ account, loginExpired: true, notificationKey: `${loginCacheKey}:${pausedCookieHash}` });
+					continue;
+				}
+				await app.Cache.delete(loginCacheKey);
+			}
+
 			for (const code of pendingCodes) {
-				const result = await redeemCodes(account, code);
+				const normalized = formatCodeValue(code);
+				if (completedCodes.has(normalized)) {
+					continue;
+				}
+
+				let result;
+				try {
+					result = await redeemCodes(account, code);
+					if (!result.success && app.HoyoLab.isExpiredLogin(result.reason) && await app.HoyoLab.refreshStoredCookies(account.cookie)) {
+						result = null;
+						result = await redeemCodes(account, code);
+					}
+				}
+				catch {
+					if (!app.HoyoLab.isExpiredLogin(result?.reason)) {
+						result = { success: false, reason: "Redemption request failed; will retry on the next run." };
+					}
+				}
+
+				if (!result.success && app.HoyoLab.isExpiredLogin(result.reason)) {
+					const cookieHash = getRedemptionCookieHash(account);
+					await app.Cache.set({ key: loginCacheKey, value: cookieHash });
+					failed.push({ account, loginExpired: true, notificationKey: `${loginCacheKey}:${cookieHash}` });
+					await setTimeout(6000);
+					break;
+				}
+
+				if (result.success || FINAL_REDEMPTION_ERRORS.has(result.retcode)) {
+					completedCodes.add(normalized);
+					await app.Cache.set({
+						key: accountCacheKey,
+						value: [...completedCodes]
+					});
+				}
+
 				if (result.success) {
 					success.push({ account, code });
 				}
@@ -185,7 +244,9 @@ const checkAndRedeem = async (codes) => {
 					failed.push({
 						account,
 						code,
-						reason: result.reason
+						notificationKey: `${accountCacheKey}:failed:${normalized}`,
+						reason: result.reason,
+						retcode: result.retcode
 					});
 				}
 
@@ -193,7 +254,10 @@ const checkAndRedeem = async (codes) => {
 			}
 		}
 
-		await appendCodesToCache(game, pendingCodes);
+		if (completedByAccount.length > 0) {
+			const completedCodes = pendingCodes.filter(code => completedByAccount.every(completed => completed.has(formatCodeValue(code))));
+			await appendCodesToCache(game.cacheKey, completedCodes);
+		}
 	}
 
 	return {
@@ -213,7 +277,7 @@ const buildMessage = (status, data) => {
 		?? (data.gameKey ? data.gameKey.toUpperCase() : (account.platform ? account.platform.toUpperCase() : "Unknown Game"));
 
 	const redeemLinkBase = REDEMPTION_LINKS[data.gameKey ?? data.platform ?? account.platform];
-	const redeemLink = redeemLinkBase ? `${redeemLinkBase}?code=${data.code.code}` : null;
+	const redeemLink = redeemLinkBase && data.code ? `${redeemLinkBase}?code=${data.code.code}` : null;
 
 	let messageTitle;
 	const detailLines = [];
@@ -227,7 +291,10 @@ const buildMessage = (status, data) => {
 			includeRewards = true;
 			break;
 		case "failed":
-			messageTitle = `Code Redeem Failed! (${data.reason})`;
+			messageTitle = data.loginExpired ? "Code Redemption Paused - HoYoLAB Login Expired" : `Code Redeem Failed! (${data.reason})`;
+			if (data.loginExpired) {
+				detailLines.push("Update your HoYoLAB cookie or restore automatic cookie refresh. Pending codes will be retried after the cookie is renewed.");
+			}
 			includeManualLink = Boolean(redeemLink);
 			break;
 		case "manual":
@@ -257,7 +324,9 @@ const buildMessage = (status, data) => {
 		messageParts.push(`\n${line}`);
 	}
 
-	messageParts.push(`\nCode: ${data.code.code}`);
+	if (data.code) {
+		messageParts.push(`\nCode: ${data.code.code}`);
+	}
 
 	if (includeManualLink && redeemLink) {
 		messageParts.push(`\n${manualLinkLabel}: ${redeemLink}`);
@@ -271,7 +340,7 @@ const buildMessage = (status, data) => {
 		isManual ? null : `(${account.uid ?? "Unknown UID"}) ${account.nickname ?? "Unknown"}`,
 		`\n${messageTitle}`,
 		...detailLines.map(line => `\n${line}`),
-		`\nCode: ${data.code.code}`
+		data.code ? `\nCode: ${data.code.code}` : null
 	].filter(Boolean);
 
 	if (includeManualLink && redeemLink) {
@@ -292,7 +361,7 @@ const buildMessage = (status, data) => {
 		description: embedDescriptionParts.join(""),
 		timestamp: new Date(),
 		footer: {
-			text: `${data.code.code}`,
+			text: data.code?.code ?? "Automatic Code Redemption",
 			icon_url: assets.logo ?? null
 		}
 	};

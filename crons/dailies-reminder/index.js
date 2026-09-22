@@ -1,6 +1,11 @@
 const RegionalTaskManager = new app.RegionalTaskManager();
+const config = require("../../config.js");
 
-RegionalTaskManager.registerTask("DailiesReminder", 21, 0, async (account) => {
+const reminderHour = config.crons?.dailiesReminderHour ?? 21;
+const reminderMinute = config.crons?.dailiesReminderMinute ?? 0;
+const reminderTimeZone = config.crons?.dailiesReminderTimeZone || null;
+
+RegionalTaskManager.registerTask("DailiesReminder", reminderHour, reminderMinute, async (account) => {
 	if (account.dailiesCheck === false) {
 		return;
 	}
@@ -8,7 +13,7 @@ RegionalTaskManager.registerTask("DailiesReminder", 21, 0, async (account) => {
 	const platform = app.HoyoLab.get(account.platform);
 	const notes = await platform.notes(account);
 	if (notes.success === false) {
-		return;
+		return false;
 	}
 
 	const { data } = notes;
@@ -65,11 +70,11 @@ RegionalTaskManager.registerTask("DailiesReminder", 21, 0, async (account) => {
 	for (const telegram of platforms.filter(p => p.name === "telegram")) {
 		await telegram.send(escapedMessage);
 	}
-});
+}, { timeZone: reminderTimeZone });
 
 module.exports = {
 	name: "dailies-reminder",
-	expression: "*/5 * * * *",
+	expression: "* * * * *",
 	description: "Reminds you to complete your dailies.",
 	code: (async function dailiesReminder () {
 		// eslint-disable-next-line object-curly-spacing
