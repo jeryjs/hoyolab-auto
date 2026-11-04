@@ -531,6 +531,10 @@ class Game {
 		return "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Safari/537.36";
 	}
 
+	getAccountLabel (account) {
+		return `${this.fullName} (${account.nickname} - ${account.uid})`;
+	}
+
 	async redeemCodes (account) {
 		const codes = await this.fetchCodes();
 		const redeemedCodes = this.getRedeemedCodes(account);
@@ -538,7 +542,7 @@ class Game {
 
 		for (const [index, code] of codes.entries()) {
 			if (redeemedCodes.includes(code.code)) {
-				console.log(t `Code ${code.code} already redeemed for ${this.fullName}`);
+				console.log(t `Code ${code.code} already redeemed for ${this.getAccountLabel(account)}`);
 				continue;
 			}
 
@@ -575,7 +579,7 @@ class Game {
 		const results = [];
 
 		for (const code of codes) {
-			console.log(t `Attempting to redeem code ${code.code} for ${this.fullName}`);
+			console.log(t `Attempting to redeem code ${code.code} for ${this.getAccountLabel(account)}`);
 			const result = await this.redeemCode(account, code);
 			results.push(result);
 			Utilities.sleep(6000);
@@ -584,7 +588,7 @@ class Game {
 			}
 		}
 
-		console.log(t `Completed forced code redemption for ${this.fullName}`);
+		console.log(t `Completed forced code redemption for ${this.getAccountLabel(account)}`);
 		return results;
 	}
 
@@ -607,6 +611,7 @@ class Game {
 
 	async redeemCode (account, codeEntry) {
 		const code = typeof codeEntry === "string" ? codeEntry : codeEntry.code;
+		const target = this.getAccountLabel(account);
 		const rewards = (typeof codeEntry === "object" && Array.isArray(codeEntry.rewards))
 			? codeEntry.rewards
 			: [];
@@ -626,7 +631,7 @@ class Game {
 			const statusCode = response.getResponseCode();
 
 			if (statusCode !== 200) {
-				console.error(t `Code ${code} redemption for ${this.fullName} returned status ${statusCode}`);
+				console.error(t `Code ${code} redemption for ${target} returned status ${statusCode}`);
 				return {
 					code,
 					rewards,
@@ -646,10 +651,10 @@ class Game {
 			// Check for authentication errors and other failures
 			if (data.retcode !== 0) {
 				if (data.retcode === -1071) {
-					console.error(t `Authentication error for code ${code} in ${this.fullName}: ${data.message}. Try logging in via incognito mode and get a fresh cookie from there.`);
+					console.error(t `Authentication error for code ${code} in ${target}: ${data.message}. Try logging in via incognito mode and get a fresh cookie from there.`);
 				}
 				else {
-					console.error(t `Code ${code} redemption failed for ${this.fullName}:`, data);
+					console.error(t `Code ${code} redemption failed for ${target}:`, data);
 				}
 
 				return {
@@ -662,7 +667,7 @@ class Game {
 				};
 			}
 
-			console.log(t `Code ${code} successfully redeemed for ${this.fullName}:`, data);
+			console.log(t `Code ${code} successfully redeemed for ${target}:`, data);
 			return {
 				code,
 				rewards,
@@ -672,7 +677,7 @@ class Game {
 			};
 		}
 		catch (e) {
-			console.error(t `Error redeeming code ${code} for ${this.fullName}:`, e);
+			console.error(t `Error redeeming code ${code} for ${target}:`, e);
 			return {
 				code,
 				rewards,
@@ -1189,7 +1194,7 @@ function manuallyRedeemCodes (gameName, forceRedeem = false) {
 	}
 
 	const embeds = [];
-	return Promise.all(accounts.map(async (cookieData) => {
+	const redeemForAccount = async (cookieData) => {
 		try {
 			const ltuid = cookieData.match(/ltuid(?:|_v2)=([^;]+)/)[1];
 			const accountDetails = await game.getAccountDetails(cookieData, ltuid);
@@ -1227,10 +1232,16 @@ function manuallyRedeemCodes (gameName, forceRedeem = false) {
 			console.error(t `Error redeeming codes for ${gameName}:`, e);
 			return { success: false, message: e.message };
 		}
-	})).then((results) => {
+	};
+
+	return (async () => {
+		const results = [];
+		for (const cookieData of accounts) {
+			results.push(await redeemForAccount(cookieData));
+		}
 		postDiscordEmbeds(embeds, game.config.assets);
 		return results;
-	});
+	})();
 }
 
 function redeemGenshinCodes () {
