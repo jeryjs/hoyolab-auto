@@ -19,15 +19,17 @@ module.exports = class CheckIn {
 			return;
 		}
 
-		const success = [];
+		const results = [];
 		for (const account of accounts) {
 			const info = await this.#getSignInfo(account.cookie);
 			if (!info.success) {
+				results.push(this.#failure(account, info.reason));
 				continue;
 			}
 
 			const awardsData = await this.#getAwardsData(account.cookie);
 			if (!awardsData.success) {
+				results.push(this.#failure(account, awardsData.reason));
 				continue;
 			}
 
@@ -48,7 +50,7 @@ module.exports = class CheckIn {
 			if (data.isSigned) {
 				app.Logger.info(`${this.#instance.fullName}:CheckIn`, t `${account.nickname} already signed in today`);
 
-				success.push({
+				results.push({
 					uid: account.uid,
 					platform: this.#instance.name,
 					rank: account.level,
@@ -68,12 +70,13 @@ module.exports = class CheckIn {
 
 			const sign = await this.#sign(account.cookie);
 			if (!sign.success) {
+				results.push(this.#failure(account, sign.reason));
 				continue;
 			}
 
 			app.Logger.info(`${this.#instance.fullName}:CheckIn`, t `(${account.uid}) ${account.nickname} Today's Reward: ${awardObject.name} x${awardObject.count}`);
 
-			success.push({
+			results.push({
 				uid: account.uid,
 				platform: this.#instance.name,
 				rank: account.level,
@@ -90,7 +93,24 @@ module.exports = class CheckIn {
 			});
 		}
 
-		return success;
+		return results;
+	}
+
+	#failure (account, reason) {
+		return {
+			failed: true,
+			uid: account.uid,
+			platform: this.#instance.name,
+			rank: account.level,
+			username: account.nickname,
+			region: app.HoyoLab.getRegion(account.region),
+			result: reason ?? t("Unknown error"),
+			assets: {
+				...this.#instance.config.assets,
+				logo: this.#logo,
+				color: this.#color
+			}
+		};
 	}
 
 	async #sign (cookieData) {
@@ -116,7 +136,8 @@ module.exports = class CheckIn {
 			});
 
 			return {
-				success: false
+				success: false,
+				reason: `HTTP ${res.statusCode}`
 			};
 		}
 		if (res.body.retcode !== 0) {
@@ -129,7 +150,8 @@ module.exports = class CheckIn {
 			});
 
 			return {
-				success: false
+				success: false,
+				reason: res.body.message || `retcode ${res.body.retcode}`
 			};
 		}
 
@@ -160,7 +182,8 @@ module.exports = class CheckIn {
 			});
 
 			return {
-				success: false
+				success: false,
+				reason: `HTTP ${res.statusCode}`
 			};
 		}
 		if (res.body.retcode !== 0) {
@@ -173,7 +196,8 @@ module.exports = class CheckIn {
 			});
 
 			return {
-				success: false
+				success: false,
+				reason: res.body.message || `retcode ${res.body.retcode}`
 			};
 		}
 
@@ -210,7 +234,8 @@ module.exports = class CheckIn {
 			});
 
 			return {
-				success: false
+				success: false,
+				reason: `HTTP ${res.statusCode}`
 			};
 		}
 		if (res.body.retcode !== 0) {
@@ -223,7 +248,8 @@ module.exports = class CheckIn {
 			});
 
 			return {
-				success: false
+				success: false,
+				reason: res.body.message || `retcode ${res.body.retcode}`
 			};
 		}
 

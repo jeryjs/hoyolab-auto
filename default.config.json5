@@ -11,6 +11,10 @@
     testNotification: {
         enabled: false, // Set to false if you don't want to receive test notifications on startup
     },
+    notifications: {
+        // 'all' = notify every check-in result, 'failures' = only notify when a check-in fails, 'none' = never notify
+        checkIn: 'all',
+    },
     platforms: [
         {
             id: 1,
