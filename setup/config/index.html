@@ -213,6 +213,17 @@
     </select>
     <div class="small-text" data-i18n="Set to false if you don't want to receive test notifications on startup">Set to false if you don't want to receive test notifications on startup</div>
     </div>
+
+    <div class="platform-section">
+    <h3 data-i18n="Check-In Notifications">Check-In Notifications</h3>
+    <label for="checkInNotifications" data-i18n="Send daily check-in notifications:">Send daily check-in notifications:</label>
+    <select id="checkInNotifications">
+        <option value="all" selected data-i18n="All results">All results</option>
+        <option value="failures" data-i18n="Failures only">Failures only</option>
+        <option value="none" data-i18n="Never">Never</option>
+    </select>
+    <div class="small-text" data-i18n="Check-ins still run automatically; this only controls the notifications.">Check-ins still run automatically; this only controls the notifications.</div>
+    </div>
     
     <!-- Platform 1: Discord Bot -->
     <div class="platform-section">
@@ -794,6 +805,7 @@
             setInputValue(document.getElementById('language'), config.language || 'en-us');
             updateLanguage();
             applyTestNotificationConfig(config.testNotification);
+            applyNotificationsConfig(config.notifications);
             applyPlatformConfig(config.platforms);
             applyCronConfig(config.crons);
             applyAccountConfig(config.accounts);
@@ -804,6 +816,11 @@
             const select = document.getElementById('testNotificationEnabled');
             const enabled = testNotification && typeof testNotification.enabled === 'boolean' ? testNotification.enabled : undefined;
             setBooleanSelectValue(select, enabled);
+        }
+
+        function applyNotificationsConfig(notifications) {
+            const mode = notifications && notifications.checkIn;
+            document.getElementById('checkInNotifications').value = ['all', 'failures', 'none'].includes(mode) ? mode : 'all';
         }
 
         function applyPlatformConfig(platforms) {
@@ -1183,6 +1200,9 @@
                 // Test notification settings
                 testNotification: {
                 enabled: testNotifyEnabled,
+                },
+                notifications: {
+                    checkIn: document.getElementById('checkInNotifications').value,
                 },
                 platforms: [
                     {

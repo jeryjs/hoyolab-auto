@@ -16,6 +16,10 @@
         enabled: false, // Set to true to enable the REST API server
         port: 8080, // Port to run the API server on
     },
+    notifications: {
+        // 'all' = notify every check-in result, 'failures' = only notify when a check-in fails, 'none' = never notify
+        checkIn: 'all',
+    },
     platforms: [
         {
             id: 1,

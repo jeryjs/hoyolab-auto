@@ -63,7 +63,14 @@ module.exports = {
 					continue;
 				}
 
-				results.push(...execution);
+				for (const result of execution) {
+					if (result.failed) {
+						errors.push({ game: `${result.assets.game} (${result.uid})`, error: result.result });
+					}
+					else {
+						results.push(result);
+					}
+				}
 			}
 			catch (e) {
 				app.Logger.error("Command:CheckIn", {
